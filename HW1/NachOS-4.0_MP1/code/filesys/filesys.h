@@ -51,7 +51,7 @@ class FileSystem {
 
     bool Create(char *name) {
 	int fileDescriptor = OpenForWrite(name);
-
+	//cout<<"fileDescriptor "<<fileDescriptor<<"\n";
 	if (fileDescriptor == -1) return FALSE;
 	Close(fileDescriptor); 
 	return TRUE; 
@@ -62,6 +62,33 @@ class FileSystem {
 	if (fileDescriptor == -1) return NULL;
 	return new OpenFile(fileDescriptor);
     }
+    OpenFileId OpenAFile(char *name) {
+	int fileDescriptor = OpenForReadWrite(name, FALSE);
+	if (fileDescriptor == -1) return NULL;
+	fileDescriptorTable[fileDescriptor] = new OpenFile(fileDescriptor);
+	return fileDescriptor;
+    }
+
+    int WriteFile(char* buffer, int size, OpenFileId id) {
+	OpenFile* file = fileDescriptorTable[id];
+	return file->Write(buffer, size*sizeof(char));
+    }
+
+    int ReadFile(char* buffer, int size, OpenFileId id) {
+	OpenFile* file = fileDescriptorTable[id];
+
+	return file->Read(buffer, size*sizeof(char));
+    }
+
+    int CloseFile(OpenFileId id) {
+	if(fileDescriptorTable[id]){
+		delete fileDescriptorTable[id];
+		return 1;
+	}
+	return -1;
+    }
+
+
 
   
 //  The OpenAFile function is used for kernel open system call

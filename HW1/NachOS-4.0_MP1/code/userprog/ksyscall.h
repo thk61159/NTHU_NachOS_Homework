@@ -40,5 +40,33 @@ int SysCreate(char *filename)
 	// 0: failed
 	return kernel->fileSystem->Create(filename);
 }
-
+OpenFileId SysOpen(char *filename)
+{
+        // return value
+        // fileId: success
+        // -1: failed
+        //return kernel->fileSystem->Open(filename);
+	return kernel->fileSystem->OpenAFile(filename);
+}
+int SysRead(char *buffer, int size, OpenFileId id)
+{
+        // return value
+        // fileId: success
+        // -1: failed
+        return kernel->fileSystem->ReadFile(buffer, size, id);
+}
+int SysWrite(char *buffer, int size, OpenFileId id)
+{
+        // return value
+        // fileId: success
+        // -1: failed
+        return kernel->fileSystem->WriteFile(buffer, size, id);
+}
+int SysClose(OpenFileId id)
+{
+        // return value
+        // fileId: success
+        // -1: failed
+        return kernel->fileSystem->CloseFile(id);
+}
 #endif /* ! __USERPROG_KSYSCALL_H__ */
