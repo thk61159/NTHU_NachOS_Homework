@@ -55,7 +55,7 @@ static int listTestVector[] = { 9, 5, 7 };
 
 // Array of values to be inserted into the HashTable
 // There are enough here to force a ReHash().
-static char *hashTestVector[] = { "0", "1", "2", "3", "4", "5", "6",
+static const char *hashTestVector[] = { "0", "1", "2", "3", "4", "5", "6",
 	 "7", "8", "9", "10", "11", "12", "13", "14"};
 
 //----------------------------------------------------------------------
@@ -76,7 +76,7 @@ LibSelfTest () {
     map->SelfTest();
     list->SelfTest(listTestVector, sizeof(listTestVector)/sizeof(int));
     sortList->SelfTest(listTestVector, sizeof(listTestVector)/sizeof(int));
-    hashTable->SelfTest(hashTestVector, sizeof(hashTestVector)/sizeof(char *));
+    hashTable->SelfTest((char **)hashTestVector, sizeof(hashTestVector)/sizeof(char *));
 
     delete map;
     delete list;
