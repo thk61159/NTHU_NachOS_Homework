@@ -173,6 +173,11 @@ Lock::~Lock()
     delete semaphore;
 }
 
+bool Lock::IsHeldByCurrentThread()
+{ 
+    return lockHolder == kernel->currentThread; 
+}
+
 //----------------------------------------------------------------------
 // Lock::Acquire
 //	Atomically wait until the lock is free, then set it to busy.

@@ -16,7 +16,7 @@ flex bison m4 libgmp-dev libmpfr-dev libmpc-dev
 ```
 ## 建立 Makefile.dep, 編譯, 測試
 ```bash
-cd 10810CS_342301_OperatingSystem/HW1/NachOS-4.0_MP1/code/build.linux
+cd NachOS-4.0_MP1/code/build.linux
 sudo apt install xutils-dev ed
 cp makedep Makefile.dep
 make clean && make #編譯

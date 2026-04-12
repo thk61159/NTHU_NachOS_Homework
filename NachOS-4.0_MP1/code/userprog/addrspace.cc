@@ -65,16 +65,51 @@ SwapHeader (NoffHeader *noffH)
 //	only uniprogramming, and we have a single unsegmented page table
 //----------------------------------------------------------------------
 
-AddrSpace::AddrSpace()
-{
-    pageTable = new TranslationEntry[NumPhysPages];
-    for (int i = 0; i < NumPhysPages; i++) {
-	pageTable[i].virtualPage = i;	// for now, virt page # = phys page #
-	pageTable[i].physicalPage = i;
-	pageTable[i].valid = TRUE;
-	pageTable[i].use = FALSE;
-	pageTable[i].dirty = FALSE;
-	pageTable[i].readOnly = FALSE;  
+AddrSpace::AddrSpace(char *fileName){   
+    OpenFile *executable = kernel->fileSystem->Open(fileName);
+    NoffHeader noffH;
+    unsigned int size;
+
+    // 讀取 NOFF Header
+    executable->ReadAt((char *)&noffH, sizeof(noffH), 0);
+
+    // 計算所需總大小與 Virtual Pages 數量
+#ifdef RDATA
+// how big is address space?
+    size = noffH.code.size + noffH.readonlyData.size + noffH.initData.size +
+           noffH.uninitData.size + UserStackSize;	
+                                                // we need to increase the size
+						// to leave room for the stack
+#else
+// how big is address space?
+    size = noffH.code.size + noffH.initData.size + noffH.uninitData.size 
+			+ UserStackSize;	// we need to increase the size
+						// to leave room for the stack
+#endif
+    numPages = divRoundUp(size, PageSize);
+
+    if (kernel->physicalPageMap->NumClear() < numPages) {
+    ASSERT(FALSE); // 記憶體不足，拒絕執行
+    }
+    pageTable = new TranslationEntry[numPages];
+
+    for (int i = 0; i < numPages; i++) {
+    int freePhysPage = kernel->physicalPageMap->FindAndSet(); 
+    if (freePhysPage == -1) {
+    // 實體記憶體滿了！
+    // 這裡應該要 return false 或丟出錯誤，拒絕載入新程式
+    DEBUG(dbgAddr, "Error: No enough physical memory.");
+    }else{
+    pageTable[i].virtualPage = i;	// for now, virt page # = phys page #
+    pageTable[i].physicalPage = freePhysPage;
+    pageTable[i].valid = TRUE;
+    pageTable[i].use = FALSE;
+    pageTable[i].dirty = FALSE;
+    pageTable[i].readOnly = FALSE;  
+    kernel->physicalPageMap->Mark(freePhysPage); 
+
+    }
+	
     }
     
     // zero out the entire address space
@@ -103,8 +138,7 @@ AddrSpace::~AddrSpace()
 //----------------------------------------------------------------------
 
 bool 
-AddrSpace::Load(char *fileName) 
-{
+AddrSpace::Load(char *fileName) {
     OpenFile *executable = kernel->fileSystem->Open(fileName);
     NoffHeader noffH;
     unsigned int size;
@@ -144,20 +178,98 @@ AddrSpace::Load(char *fileName)
 
 // then, copy in the code and data segments into memory
 // Note: this code assumes that virtual address = physical address
+    // if (noffH.code.size > 0) {
+    //     DEBUG(dbgAddr, "Initializing code segment.");
+	// DEBUG(dbgAddr, noffH.code.virtualAddr << ", " << noffH.code.size);
+    //     executable->ReadAt(
+	// 	&(kernel->machine->mainMemory[noffH.code.virtualAddr]), 
+	// 		noffH.code.size, noffH.code.inFileAddr);
+    // }
+    // if (noffH.initData.size > 0) {
+    //     DEBUG(dbgAddr, "Initializing data segment.");
+	// DEBUG(dbgAddr, noffH.initData.virtualAddr << ", " << noffH.initData.size);
+    //     executable->ReadAt(
+	// 	&(kernel->machine->mainMemory[noffH.initData.virtualAddr]),
+	// 		noffH.initData.size, noffH.initData.inFileAddr);
+    // }
     if (noffH.code.size > 0) {
         DEBUG(dbgAddr, "Initializing code segment.");
-	DEBUG(dbgAddr, noffH.code.virtualAddr << ", " << noffH.code.size);
-        executable->ReadAt(
-		&(kernel->machine->mainMemory[noffH.code.virtualAddr]), 
-			noffH.code.size, noffH.code.inFileAddr);
+        DEBUG(dbgAddr, noffH.code.virtualAddr << ", " << noffH.code.size);
+        // 1. 設定初始的讀取指標與剩餘大小
+        int numBytesToRead = noffH.code.size;
+        int virtualAddr = noffH.code.virtualAddr;
+        int inFileAddr = noffH.code.inFileAddr;
+
+        // 2. 當還有資料沒讀完時，繼續切塊搬運
+        while (numBytesToRead > 0) {
+            // 算出目前的虛擬位址對應到哪個 VPN 與 Offset
+            int vpn = virtualAddr / PageSize;
+            int offset = virtualAddr % PageSize;
+
+            // 查表，得到精準的 Physical Address
+            int ppn = pageTable[vpn].physicalPage;
+            int physAddr = (ppn * PageSize) + offset;
+
+            // 🌟 核心邏輯：計算這回合「最多」能讀幾個 Bytes？
+            // 規則：不能跨越當前實體分頁的邊界！
+            int bytesToReadThisPage = PageSize - offset; 
+            
+            // 如果剩下的資料量，比這頁的剩餘空間還要小，那就只要讀剩下的量就好
+            if (numBytesToRead < bytesToReadThisPage) {
+                bytesToReadThisPage = numBytesToRead;
+            }
+
+            // 3. 讀取這一個 Chunk 的資料，安全地放進實體記憶體
+            executable->ReadAt(&(kernel->machine->mainMemory[physAddr]), 
+                            bytesToReadThisPage, 
+                            inFileAddr);
+
+            // 4. 更新各項指標，準備處理下一塊 Chunk
+            numBytesToRead -= bytesToReadThisPage;
+            virtualAddr += bytesToReadThisPage;
+            inFileAddr += bytesToReadThisPage;
+        }
     }
     if (noffH.initData.size > 0) {
         DEBUG(dbgAddr, "Initializing data segment.");
-	DEBUG(dbgAddr, noffH.initData.virtualAddr << ", " << noffH.initData.size);
-        executable->ReadAt(
-		&(kernel->machine->mainMemory[noffH.initData.virtualAddr]),
-			noffH.initData.size, noffH.initData.inFileAddr);
+        DEBUG(dbgAddr, noffH.initData.virtualAddr << ", " << noffH.initData.size);
+
+        // 1. 設定初始的讀取指標與剩餘大小
+        int numBytesToRead = noffH.initData.size;
+        int virtualAddr = noffH.initData.virtualAddr;
+        int inFileAddr = noffH.initData.inFileAddr;
+
+        // 2. 當還有資料沒讀完時，繼續切塊搬運
+        while (numBytesToRead > 0) {
+            // 算出目前的虛擬位址對應到哪個 VPN 與 Offset
+            int vpn = virtualAddr / PageSize;
+            int offset = virtualAddr % PageSize;
+
+            // 查表，得到精準的 Physical Address
+            int ppn = pageTable[vpn].physicalPage;
+            int physAddr = (ppn * PageSize) + offset;
+
+            // 🌟 核心邏輯：計算這回合「最多」能讀幾個 Bytes？
+            // 規則：不能跨越當前實體分頁的邊界！
+            int bytesToReadThisPage = PageSize - offset; 
+            
+            // 如果剩下的資料量，比這頁的剩餘空間還要小，那就只要讀剩下的量就好
+            if (numBytesToRead < bytesToReadThisPage) {
+                bytesToReadThisPage = numBytesToRead;
+            }
+
+            // 3. 讀取這一個 Chunk 的資料，安全地放進實體記憶體
+            executable->ReadAt(&(kernel->machine->mainMemory[physAddr]), 
+                            bytesToReadThisPage, 
+                            inFileAddr);
+
+            // 4. 更新各項指標，準備處理下一塊 Chunk
+            numBytesToRead -= bytesToReadThisPage;
+            virtualAddr += bytesToReadThisPage;
+            inFileAddr += bytesToReadThisPage;
+        }
     }
+    
 
 #ifdef RDATA
     if (noffH.readonlyData.size > 0) {

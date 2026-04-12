@@ -106,6 +106,8 @@ Kernel::Initialize()
     synchConsoleIn = new SynchConsoleInput(consoleIn); // input from stdin
     synchConsoleOut = new SynchConsoleOutput(consoleOut); // output to stdout
     synchDisk = new SynchDisk();    //
+    physicalPageMap = new Bitmap(NumPhysPages); //
+    consoleLock = new Lock("ConsoleOutputLock");
 #ifdef FILESYS_STUB
     fileSystem = new FileSystem();
 #else
@@ -135,6 +137,8 @@ Kernel::~Kernel()
     delete fileSystem;
     delete postOfficeIn;
     delete postOfficeOut;
+    delete physicalPageMap;
+    delete consoleLock;
     
     Exit(0);
 }
@@ -271,7 +275,7 @@ void Kernel::ExecAll()
 int Kernel::Exec(char* name)
 {
 	t[threadNum] = new Thread(name, threadNum);
-	t[threadNum]->space = new AddrSpace();
+	t[threadNum]->space = new AddrSpace(name);
 	t[threadNum]->Fork((VoidFunctionPtr) &ForkExecute, (void *)t[threadNum]);
 	threadNum++;
 

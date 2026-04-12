@@ -18,12 +18,15 @@
 #include "alarm.h"
 #include "filesys.h"
 #include "machine.h"
+#include "bitmap.h" //
+#include "synch.h"
 
 class PostOfficeInput;
 class PostOfficeOutput;
 class SynchConsoleInput;
 class SynchConsoleOutput;
 class SynchDisk;
+class Lock;
 
 typedef int OpenFileId;
 
@@ -68,6 +71,8 @@ class Kernel {
     FileSystem *fileSystem;     
     PostOfficeInput *postOfficeIn;
     PostOfficeOutput *postOfficeOut;
+    Bitmap *physicalPageMap; //
+    Lock *consoleLock; 
 
     int hostName;               // machine identifier
 

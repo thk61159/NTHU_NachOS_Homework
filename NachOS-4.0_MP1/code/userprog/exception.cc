@@ -68,8 +68,10 @@ ExceptionHandler(ExceptionType which)
 	    case SC_PrintInt:
 		DEBUG(dbgSys, "Print Int\n");
 		val=kernel->machine->ReadRegister(4);
+		kernel->consoleLock->Acquire(); //lock
 		DEBUG(dbgTraCode, "In ExceptionHandler(), into SysPrintInt, " << kernel->stats->totalTicks);    
 		SysPrintInt(val); 	
+		kernel->consoleLock->Release(); //release
 		DEBUG(dbgTraCode, "In ExceptionHandler(), return from SysPrintInt, " << kernel->stats->totalTicks);
 		// Set Program Counter
 		kernel->machine->WriteRegister(PrevPCReg, kernel->machine->ReadRegister(PCReg));
