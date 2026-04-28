@@ -135,6 +135,16 @@ Interrupt::SetLevel(IntStatus now)
     return old;
 }
 
+//----------------------------------------------------------------------
+// Interrupt::OneTick
+// 	Advance simulated time and check if there are any pending 
+//	interrupts to be called. 
+//
+//	Two things can cause OneTick to be called:
+//		interrupts are re-enabled
+//		a user instruction is executed
+//----------------------------------------------------------------------
+
 void
 Interrupt::OneTick()
 {

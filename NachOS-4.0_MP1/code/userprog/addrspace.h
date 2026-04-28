@@ -18,6 +18,12 @@
 
 #define UserStackSize		1024 	// increase this as necessary!
 
+struct SegmentInfo {
+    int virtualAddr;
+    int inFileAddr;
+    int size;
+};
+
 class AddrSpace {
   public:
     AddrSpace(char *fileName);			// Create an address space.
@@ -39,6 +45,8 @@ class AddrSpace {
     // is 0 for Read, 1 for Write.
     ExceptionType Translate(unsigned int vaddr, unsigned int *paddr, int mode);
 
+    void HandlePageFault(int vaddr);
+
   private:
     TranslationEntry *pageTable;	// Assume linear page table translation
 					// for now!
@@ -48,6 +56,10 @@ class AddrSpace {
     void InitRegisters();		// Initialize user-level CPU registers,
 					// before jumping to user code
 
+    SegmentInfo codeSeg, dataSeg; //
+
+    OpenFile *executable;
+    
 };
 
 #endif // ADDRSPACE_H
